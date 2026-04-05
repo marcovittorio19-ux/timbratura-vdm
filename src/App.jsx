@@ -29,24 +29,24 @@ function App() {
   }
 
 const caricaDatiAdmin = async () => {
-    // Nota: usiamo il nome della tabella 'profili' per il join
-    const { data, error } = await supabase
-      .from('timbrature')
-      .select(`
-        id,
-        creato_il,
-        tipo,
-        sedi ( nome ),
-        profili ( nome_completo )
-      `)
-      .order('creato_il', { ascending: false });
-    
-    if (error) {
-      console.error("Errore fetch dettagliato:", error);
-    } else {
-      setTutteLeTimbrature(data || []);
-    }
-  };
+  const { data, error } = await supabase
+    .from('timbrature')
+    .select(`
+      id,
+      creato_il,
+      tipo,
+      sedi ( nome ),
+      profili ( nome_completo )
+    `)
+    .order('creato_il', { ascending: false });
+
+  if (error) {
+    console.error("Errore fetch dettagliato:", error);
+  } else {
+    console.log("Dati ricevuti con successo:", data);
+    setTutteLeTimbrature(data || []);
+  }
+};
 
   const handleLogin = async (e) => {
     e.preventDefault()
