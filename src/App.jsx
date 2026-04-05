@@ -28,25 +28,24 @@ function App() {
     }
   }
 
-const caricaDatiAdmin = async () => {
-  const { data, error } = await supabase
-    .from('timbrature')
-    .select(`
-      id,
-      creato_il,
-      tipo,
-      sedi ( nome ),
-      profili ( nome_completo )
-    `)
-    .order('creato_il', { ascending: false });
+  const caricaDatiAdmin = async () => {
+    const { data, error } = await supabase
+      .from('timbrature')
+      .select(`
+        id,
+        creato_il,
+        tipo,
+        sedi ( nome ),
+        profili ( nome_completo )
+      `)
+      .order('creato_il', { ascending: false });
 
-  if (error) {
-    console.error("Errore fetch dettagliato:", error);
-  } else {
-    console.log("Dati ricevuti con successo:", data);
-    setTutteLeTimbrature(data || []);
-  }
-};
+    if (error) {
+      console.error("Errore fetch dettagliato:", error);
+    } else {
+      setTutteLeTimbrature(data || []);
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -60,27 +59,35 @@ const caricaDatiAdmin = async () => {
 
   const onScanSuccess = async (decodedText) => {
     if (caricamento) return;
-    setCaricamento(true)
-    setMessaggio("Codice letto! Controllo posizione...")
+    
+    const tipoScelto = messaggio.includes('USCITA') ? 'USCITA' : 'ENTRATA';
+    
+    setCaricamento(true);
+    setMessaggio(`Invio ${tipoScelto}...`);
 
     navigator.geolocation.getCurrentPosition(async (pos) => {
       const { latitude, longitude } = pos.coords;
+      
       const { data, error } = await supabase.rpc('registra_timbratura_sicura', {
         p_qr_secret: decodedText,
         p_lat: latitude,
         p_lon: longitude,
-        p_tipo: 'ENTRATA'
+        p_tipo: tipoScelto 
       });
 
-      if (error) setMessaggio("Errore: " + error.message);
-      else {
+      if (error) {
+        setMessaggio(error.message); 
+      } else {
         setMessaggio(data.message);
-        if (ruolo === 'ADMIN') caricaDatiAdmin(); // Aggiorna se admin sta testando
+        if (ruolo === 'ADMIN') caricaDatiAdmin();
       }
-      setCaricamento(false)
+      
+      // Pausa di 5 secondi per evitare scansioni multiple
+      setTimeout(() => setCaricamento(false), 5000);
+
     }, () => {
       setMessaggio("Attiva il GPS!");
-      setCaricamento(false)
+      setCaricamento(false);
     });
   };
 
@@ -90,7 +97,7 @@ const caricaDatiAdmin = async () => {
       scanner.render(onScanSuccess);
       return () => scanner.clear().catch(console.error);
     }
-  }, [user, ruolo]);
+  }, [user, ruolo, messaggio]); // Aggiunto messaggio alle dipendenze per sicurezza
 
   if (!user) {
     return (
@@ -144,10 +151,39 @@ const caricaDatiAdmin = async () => {
         </div>
       ) : (
         <div>
-          <p style={{ fontSize: '1.2rem' }}>Benvenuto! Inquadra il QR della sede.</p>
+          {/* SELETTORE ENTRATA/USCITA */}
+          <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '15px' }}>
+            <button 
+              onClick={() => setMessaggio("Inquadra per ENTRATA")}
+              style={{ 
+                padding: '12px 20px', 
+                backgroundColor: messaggio.includes('ENTRATA') ? '#3ecf8e' : '#333', 
+                color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' 
+              }}
+            >
+              ENTRATA
+            </button>
+            <button 
+              onClick={() => setMessaggio("Inquadra per USCITA")}
+              style={{ 
+                padding: '12px 20px', 
+                backgroundColor: messaggio.includes('USCITA') ? '#3ecf8e' : '#333', 
+                color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' 
+              }}
+            >
+              USCITA
+            </button>
+          </div>
+
           <div id="reader" style={{ width: '100%', maxWidth: '400px', margin: 'auto', border: '2px solid #3ecf8e', borderRadius: '10px', overflow: 'hidden' }}></div>
+          
           <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#1e1e1e', borderRadius: '15px', border: '1px solid #333' }}>
-            <h3 style={{ margin: 0, color: messaggio.includes('Errore') ? '#ff4444' : '#3ecf8e' }}>{messaggio}</h3>
+            <h3 style={{ 
+              margin: 0, 
+              color: messaggio.includes('Errore') || messaggio.includes('già') ? '#ff4444' : '#3ecf8e' 
+            }}>
+              {messaggio}
+            </h3>
           </div>
         </div>
       )}
