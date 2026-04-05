@@ -29,7 +29,19 @@ function App() {
   }
 
   const caricaDatiAdmin = async () => {
-    const { data } = await supabase.from('timbrature').select('*, sedi(nome)').order('creato_il', { ascending: false })
+    // Recupera timbrature + nome sede + nome completo dal profilo collegato
+    const { data, error } = await supabase
+      .from('timbrature')
+      .select(`
+        id,
+        creato_il,
+        tipo,
+        sedi(nome),
+        profili:utente_id(nome_completo)
+      `)
+      .order('creato_il', { ascending: false })
+    
+    if (error) console.error("Errore fetch:", error)
     if (data) setTutteLeTimbrature(data)
   }
 
@@ -58,7 +70,10 @@ function App() {
       });
 
       if (error) setMessaggio("Errore: " + error.message);
-      else setMessaggio(data.message);
+      else {
+        setMessaggio(data.message);
+        if (ruolo === 'ADMIN') caricaDatiAdmin(); // Aggiorna se admin sta testando
+      }
       setCaricamento(false)
     }, () => {
       setMessaggio("Attiva il GPS!");
@@ -103,6 +118,7 @@ function App() {
                 <thead>
                   <tr style={{ backgroundColor: '#1e1e1e', color: '#3ecf8e' }}>
                     <th style={{ padding: '12px', borderBottom: '1px solid #333' }}>Data e Ora</th>
+                    <th style={{ padding: '12px', borderBottom: '1px solid #333' }}>Operaio</th>
                     <th style={{ padding: '12px', borderBottom: '1px solid #333' }}>Sede</th>
                     <th style={{ padding: '12px', borderBottom: '1px solid #333' }}>Tipo</th>
                   </tr>
@@ -111,6 +127,7 @@ function App() {
                   {tutteLeTimbrature.map((t) => (
                     <tr key={t.id} style={{ borderBottom: '1px solid #222' }}>
                       <td style={{ padding: '12px' }}>{new Date(t.creato_il).toLocaleString()}</td>
+                      <td style={{ padding: '12px', fontWeight: 'bold' }}>{t.profili?.nome_completo || 'N.D.'}</td>
                       <td style={{ padding: '12px' }}>{t.sedi?.nome || 'Sede sconosciuta'}</td>
                       <td style={{ padding: '12px' }}>{t.tipo}</td>
                     </tr>
