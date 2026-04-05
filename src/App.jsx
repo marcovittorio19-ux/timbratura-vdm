@@ -12,22 +12,25 @@ function App() {
   const [tutteLeTimbrature, setTutteLeTimbrature] = useState([])
 
   useEffect(() => {
-    // Controlla se l'utente è già loggato
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) controlloRuolo(session.user.id)
+      if (session?.user) {
+        setUser(session.user)
+        controlloRuolo(session.user.id)
+      }
     })
   }, [])
 
   const controlloRuolo = async (userId) => {
     const { data } = await supabase.from('profili').select('ruolo').eq('id', userId).single()
-    setRuolo(data?.ruolo)
-    if (data?.ruolo === 'ADMIN') caricaDatiAdmin()
+    if (data) {
+      setRuolo(data.ruolo)
+      if (data.ruolo === 'ADMIN') caricaDatiAdmin()
+    }
   }
 
   const caricaDatiAdmin = async () => {
     const { data } = await supabase.from('timbrature').select('*, sedi(nome)').order('creato_il', { ascending: false })
-    setTutteLeTimbrature(data)
+    if (data) setTutteLeTimbrature(data)
   }
 
   const handleLogin = async (e) => {
@@ -67,7 +70,7 @@ function App() {
     if (user && ruolo === 'OPERAIO') {
       const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
       scanner.render(onScanSuccess);
-      return () => scanner.clear();
+      return () => scanner.clear().catch(console.error);
     }
   }, [user, ruolo]);
 
@@ -76,9 +79,9 @@ function App() {
       <div style={{ textAlign: 'center', padding: '50px', backgroundColor: '#121212', color: 'white', minHeight: '100vh' }}>
         <h1 style={{ color: '#3ecf8e' }}>VDM Login</h1>
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '300px', margin: 'auto' }}>
-          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ padding: '10px' }} />
-          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ padding: '10px' }} />
-          <button type="submit" style={{ padding: '10px', backgroundColor: '#3ecf8e', border: 'none', cursor: 'pointer' }}>Entra</button>
+          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #333' }} />
+          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #333' }} />
+          <button type="submit" style={{ padding: '10px', backgroundColor: '#3ecf8e', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>Entra</button>
         </form>
       </div>
     )
@@ -86,41 +89,47 @@ function App() {
 
   return (
     <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#121212', color: 'white', minHeight: '100vh' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ color: '#3ecf8e' }}>VDM Software</h1>
-        <button onClick={() => supabase.auth.signOut()} style={{ backgroundColor: 'red', color: 'white', border: 'none', padding: '5px 10px' }}>Esci</button>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1 style={{ color: '#3ecf8e', margin: 0 }}>VDM Software</h1>
+        <button onClick={() => { supabase.auth.signOut(); setUser(null); }} style={{ backgroundColor: '#ff4444', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer' }}>Esci</button>
       </header>
 
       {ruolo === 'ADMIN' ? (
         <div style={{ marginTop: '20px' }}>
-          <h2>Pannello Controllo Admin</h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#1e1e1e' }}>
-                <th style={{ padding: '10px' }}>Data</th>
-                <th>Sede</th>
-                <th>Tipo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tutteLeTimbrature.map((t) => (
-                <tr key={t.id} style={{ borderBottom: '1px solid #333' }}>
-                  <td style={{ padding: '10px' }}>{new Date(t.creato_il).toLocaleString()}</td>
-                  <td>{t.sedi?.nome}</td>
-                  <td>{t.tipo}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <h2 style={{ borderBottom: '2px solid #3ecf8e', paddingBottom: '10px' }}>Pannello Admin - Tutte le Timbrature</h2>
+          {tutteLeTimbrature && tutteLeTimbrature.length > 0 ? (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#1e1e1e', color: '#3ecf8e' }}>
+                    <th style={{ padding: '12px', borderBottom: '1px solid #333' }}>Data e Ora</th>
+                    <th style={{ padding: '12px', borderBottom: '1px solid #333' }}>Sede</th>
+                    <th style={{ padding: '12px', borderBottom: '1px solid #333' }}>Tipo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tutteLeTimbrature.map((t) => (
+                    <tr key={t.id} style={{ borderBottom: '1px solid #222' }}>
+                      <td style={{ padding: '12px' }}>{new Date(t.creato_il).toLocaleString()}</td>
+                      <td style={{ padding: '12px' }}>{t.sedi?.nome || 'Sede sconosciuta'}</td>
+                      <td style={{ padding: '12px' }}>{t.tipo}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p style={{ marginTop: '20px', color: '#888' }}>Caricamento dati o nessuna timbratura presente...</p>
+          )}
         </div>
       ) : (
-        <>
-          <p>Benvenuto! Inquadra il QR per timbrare.</p>
-          <div id="reader" style={{ width: '100%', maxWidth: '400px', margin: 'auto', border: '2px solid #3ecf8e' }}></div>
-          <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#1e1e1e', borderRadius: '15px' }}>
-            <h3>{messaggio}</h3>
+        <div>
+          <p style={{ fontSize: '1.2rem' }}>Benvenuto! Inquadra il QR della sede.</p>
+          <div id="reader" style={{ width: '100%', maxWidth: '400px', margin: 'auto', border: '2px solid #3ecf8e', borderRadius: '10px', overflow: 'hidden' }}></div>
+          <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#1e1e1e', borderRadius: '15px', border: '1px solid #333' }}>
+            <h3 style={{ margin: 0, color: messaggio.includes('Errore') ? '#ff4444' : '#3ecf8e' }}>{messaggio}</h3>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
