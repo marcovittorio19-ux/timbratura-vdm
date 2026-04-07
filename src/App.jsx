@@ -6,10 +6,15 @@ function App() {
   const [user, setUser] = useState(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [messaggio, setMessaggio] = useState("Inquadra il QR per timbrare")
+  const [messaggio, setMessaggio] = useState("Pronto per la timbratura")
   const [caricamento, setCaricamento] = useState(false)
   const [ruolo, setRuolo] = useState('OPERAIO')
   const [tutteLeTimbrature, setTutteLeTimbrature] = useState([])
+
+  // Colori Aziendali
+  const AZZURRO = "#007BFF"; // Puoi cambiare questo codice esagonale con l'azzurro esatto del tuo logo
+  const BIANCO = "#FFFFFF";
+  const GRIGIO_LIGHT = "#f8f9fa";
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -31,26 +36,15 @@ function App() {
   const caricaDatiAdmin = async () => {
     const { data, error } = await supabase
       .from('timbrature')
-      .select(`
-        id,
-        creato_il,
-        tipo,
-        sedi ( nome ),
-        profili ( nome_completo )
-      `)
+      .select(`id, creato_il, tipo, sedi ( nome ), profili ( nome_completo )`)
       .order('creato_il', { ascending: false });
-
-    if (error) {
-      console.error("Errore fetch dettagliato:", error);
-    } else {
-      setTutteLeTimbrature(data || []);
-    }
+    if (!error) setTutteLeTimbrature(data || []);
   };
 
   const handleLogin = async (e) => {
     e.preventDefault()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) alert(error.message)
+    if (error) alert("Credenziali errate")
     else {
       setUser(data.user)
       controlloRuolo(data.user.id)
@@ -59,34 +53,24 @@ function App() {
 
   const onScanSuccess = async (decodedText) => {
     if (caricamento) return;
-    
     const tipoScelto = messaggio.includes('USCITA') ? 'USCITA' : 'ENTRATA';
-    
     setCaricamento(true);
-    setMessaggio(`Invio ${tipoScelto}...`);
+    setMessaggio(`Registrazione ${tipoScelto} in corso...`);
 
     navigator.geolocation.getCurrentPosition(async (pos) => {
       const { latitude, longitude } = pos.coords;
-      
       const { data, error } = await supabase.rpc('registra_timbratura_sicura', {
-        p_qr_secret: decodedText,
-        p_lat: latitude,
-        p_lon: longitude,
-        p_tipo: tipoScelto 
+        p_qr_secret: decodedText, p_lat: latitude, p_lon: longitude, p_tipo: tipoScelto 
       });
 
-      if (error) {
-        setMessaggio(error.message); 
-      } else {
-        setMessaggio(data.message);
+      if (error) setMessaggio("Errore: " + error.message);
+      else {
+        setMessaggio("✅ " + data.message);
         if (ruolo === 'ADMIN') caricaDatiAdmin();
       }
-      
-      // Pausa di 5 secondi per evitare scansioni multiple
-      setTimeout(() => setCaricamento(false), 5000);
-
+      setTimeout(() => { setCaricamento(false); setMessaggio(`Seleziona prossima azione`); }, 4000);
     }, () => {
-      setMessaggio("Attiva il GPS!");
+      setMessaggio("❌ Attiva il GPS!");
       setCaricamento(false);
     });
   };
@@ -97,96 +81,75 @@ function App() {
       scanner.render(onScanSuccess);
       return () => scanner.clear().catch(console.error);
     }
-  }, [user, ruolo, messaggio]); // Aggiunto messaggio alle dipendenze per sicurezza
+  }, [user, ruolo, messaggio]);
 
+  // SCHERMATA LOGIN
   if (!user) {
     return (
-      <div style={{ textAlign: 'center', padding: '50px', backgroundColor: '#121212', color: 'white', minHeight: '100vh' }}>
-        <h1 style={{ color: '#3ecf8e' }}>VDM Login</h1>
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '300px', margin: 'auto' }}>
-          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #333' }} />
-          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #333' }} />
-          <button type="submit" style={{ padding: '10px', backgroundColor: '#3ecf8e', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>Entra</button>
+      <div style={{ textAlign: 'center', padding: '40px 20px', backgroundColor: BIANCO, color: '#333', minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <img src="/logo.png" alt="Logo Azienda" style={{ height: '100px', margin: '0 auto 30px', objectFit: 'contain' }} />
+        <h2 style={{ color: AZZURRO, marginBottom: '20px' }}>Area Riservata Personale</h2>
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '350px', margin: 'auto', width: '100%' }}>
+          <input type="email" placeholder="Email aziendale" value={email} onChange={(e) => setEmail(e.target.value)} style={{ padding: '15px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '16px' }} />
+          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ padding: '15px', borderRadius: '10px', border: '1px solid #ddd', fontSize: '16px' }} />
+          <button type="submit" style={{ padding: '15px', backgroundColor: AZZURRO, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px', boxShadow: '0 4px 6px rgba(0,123,255,0.2)' }}>ACCEDI</button>
         </form>
       </div>
     )
   }
 
+  // SCHERMATA APP (OPERAIO O ADMIN)
   return (
-    <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#121212', color: 'white', minHeight: '100vh' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 style={{ color: '#3ecf8e', margin: 0 }}>VDM Software</h1>
-        <button onClick={() => { supabase.auth.signOut(); setUser(null); }} style={{ backgroundColor: '#ff4444', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer' }}>Esci</button>
+    <div style={{ textAlign: 'center', backgroundColor: GRIGIO_LIGHT, color: '#333', minHeight: '100vh' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', backgroundColor: BIANCO, borderBottom: `3px solid ${AZZURRO}`, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+        <img src="/logo.png" alt="Logo" style={{ height: '40px' }} />
+        <button onClick={() => { supabase.auth.signOut(); setUser(null); }} style={{ backgroundColor: '#f44336', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Esci</button>
       </header>
 
-      {ruolo === 'ADMIN' ? (
-        <div style={{ marginTop: '20px' }}>
-          <h2 style={{ borderBottom: '2px solid #3ecf8e', paddingBottom: '10px' }}>Pannello Admin - Tutte le Timbrature</h2>
-          {tutteLeTimbrature && tutteLeTimbrature.length > 0 ? (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
+      <main style={{ padding: '20px' }}>
+        {ruolo === 'ADMIN' ? (
+          <div>
+            <h2 style={{ color: AZZURRO }}>Riepilogo Timbrature</h2>
+            <div style={{ overflowX: 'auto', backgroundColor: BIANCO, borderRadius: '15px', padding: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#1e1e1e', color: '#3ecf8e' }}>
-                    <th style={{ padding: '12px', borderBottom: '1px solid #333' }}>Data e Ora</th>
-                    <th style={{ padding: '12px', borderBottom: '1px solid #333' }}>Operaio</th>
-                    <th style={{ padding: '12px', borderBottom: '1px solid #333' }}>Sede</th>
-                    <th style={{ padding: '12px', borderBottom: '1px solid #333' }}>Tipo</th>
+                  <tr style={{ borderBottom: `2px solid ${AZZURRO}`, color: AZZURRO }}>
+                    <th style={{ padding: '12px' }}>Data/Ora</th>
+                    <th style={{ padding: '12px' }}>Dipendente</th>
+                    <th style={{ padding: '12px' }}>Sede</th>
+                    <th style={{ padding: '12px' }}>Azione</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tutteLeTimbrature.map((t) => (
-                    <tr key={t.id} style={{ borderBottom: '1px solid #222' }}>
-                      <td style={{ padding: '12px' }}>{new Date(t.creato_il).toLocaleString()}</td>
-                      <td style={{ padding: '12px', fontWeight: 'bold' }}>{t.profili?.nome_completo || 'N.D.'}</td>
-                      <td style={{ padding: '12px' }}>{t.sedi?.nome || 'Sede sconosciuta'}</td>
-                      <td style={{ padding: '12px' }}>{t.tipo}</td>
+                    <tr key={t.id} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '12px', fontSize: '14px' }}>{new Date(t.creato_il).toLocaleString()}</td>
+                      <td style={{ padding: '12px', fontWeight: '600' }}>{t.profili?.nome_completo || 'Utente'}</td>
+                      <td style={{ padding: '12px' }}>{t.sedi?.nome}</td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ padding: '4px 8px', borderRadius: '5px', fontSize: '12px', backgroundColor: t.tipo === 'ENTRATA' ? '#e3f2fd' : '#fff3e0', color: t.tipo === 'ENTRATA' ? '#1976d2' : '#e65100' }}>{t.tipo}</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <p style={{ marginTop: '20px', color: '#888' }}>Caricamento dati o nessuna timbratura presente...</p>
-          )}
-        </div>
-      ) : (
-        <div>
-          {/* SELETTORE ENTRATA/USCITA */}
-          <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center', gap: '15px' }}>
-            <button 
-              onClick={() => setMessaggio("Inquadra per ENTRATA")}
-              style={{ 
-                padding: '12px 20px', 
-                backgroundColor: messaggio.includes('ENTRATA') ? '#3ecf8e' : '#333', 
-                color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' 
-              }}
-            >
-              ENTRATA
-            </button>
-            <button 
-              onClick={() => setMessaggio("Inquadra per USCITA")}
-              style={{ 
-                padding: '12px 20px', 
-                backgroundColor: messaggio.includes('USCITA') ? '#3ecf8e' : '#333', 
-                color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' 
-              }}
-            >
-              USCITA
-            </button>
           </div>
+        ) : (
+          <div style={{ maxWidth: '500px', margin: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '25px' }}>
+              <button onClick={() => setMessaggio("Inquadra per ENTRATA")} style={{ flex: 1, padding: '20px', backgroundColor: messaggio.includes('ENTRATA') ? AZZURRO : BIANCO, color: messaggio.includes('ENTRATA') ? BIANCO : AZZURRO, border: `2px solid ${AZZURRO}`, borderRadius: '15px', fontWeight: 'bold', cursor: 'pointer', transition: '0.3s' }}>ENTRATA</button>
+              <button onClick={() => setMessaggio("Inquadra per USCITA")} style={{ flex: 1, padding: '20px', backgroundColor: messaggio.includes('USCITA') ? AZZURRO : BIANCO, color: messaggio.includes('USCITA') ? BIANCO : AZZURRO, border: `2px solid ${AZZURRO}`, borderRadius: '15px', fontWeight: 'bold', cursor: 'pointer', transition: '0.3s' }}>USCITA</button>
+            </div>
 
-          <div id="reader" style={{ width: '100%', maxWidth: '400px', margin: 'auto', border: '2px solid #3ecf8e', borderRadius: '10px', overflow: 'hidden' }}></div>
-          
-          <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#1e1e1e', borderRadius: '15px', border: '1px solid #333' }}>
-            <h3 style={{ 
-              margin: 0, 
-              color: messaggio.includes('Errore') || messaggio.includes('già') ? '#ff4444' : '#3ecf8e' 
-            }}>
-              {messaggio}
-            </h3>
+            <div id="reader" style={{ width: '100%', borderRadius: '20px', overflow: 'hidden', border: `4px solid ${AZZURRO}`, backgroundColor: BIANCO }}></div>
+            
+            <div style={{ marginTop: '25px', padding: '20px', backgroundColor: BIANCO, borderRadius: '20px', boxShadow: '0 8px 20px rgba(0,0,0,0.08)' }}>
+              <h3 style={{ margin: 0, color: messaggio.includes('Errore') || messaggio.includes('❌') ? '#d32f2f' : AZZURRO }}>{messaggio}</h3>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   )
 }
