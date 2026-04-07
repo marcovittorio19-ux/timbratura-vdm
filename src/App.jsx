@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { supabase } from './supabaseClient'
 
@@ -83,6 +85,41 @@ function App() {
     }
   }, [user, ruolo, messaggio]);
 
+  // Trova la fine di onScanSuccess e incolla questo:
+
+const generaPDF = () => {
+  const doc = new jsPDF();
+  
+  // Intestazione del documento
+  doc.setFontSize(18);
+  doc.setTextColor(0, 123, 255); // Azzurro aziendale
+  doc.text("Riepilogo Timbrature - VDM Software", 14, 20);
+  
+  doc.setFontSize(11);
+  doc.setTextColor(100);
+  doc.text(`Report generato il: ${new Date().toLocaleString()}`, 14, 30);
+
+  // Trasforma i dati per la tabella
+  const tableRows = tutteLeTimbrature.map(t => [
+    new Date(t.creato_il).toLocaleString(),
+    t.profili?.nome_completo || 'Utente',
+    t.sedi?.nome || 'Sede N.D.',
+    t.tipo
+  ]);
+
+  // Genera la tabella automatica
+  doc.autoTable({
+    head: [['Data e Ora', 'Dipendente', 'Sede', 'Azione']],
+    body: tableRows,
+    startY: 40,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [0, 123, 255] }, // Azzurro per l'intestazione
+  });
+
+  // Salva il file sul dispositivo
+  doc.save(`Report_VDM_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
   // SCHERMATA LOGIN
   if (!user) {
     return (
@@ -107,9 +144,28 @@ function App() {
       </header>
 
       <main style={{ padding: '20px' }}>
-        {ruolo === 'ADMIN' ? (
-          <div>
-            <h2 style={{ color: AZZURRO }}>Riepilogo Timbrature</h2>
+{ruolo === 'ADMIN' ? (
+  <div>
+    {/* CONTENITORE TITOLO + PULSANTE PDF */}
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '10px' }}>
+      <h2 style={{ color: AZZURRO, margin: 0 }}>Riepilogo Timbrature</h2>
+      <button 
+        onClick={generaPDF}
+        style={{ 
+          padding: '10px 15px', 
+          backgroundColor: '#28a745', 
+          color: 'white', 
+          border: 'none', 
+          borderRadius: '8px', 
+          fontWeight: 'bold', 
+          cursor: 'pointer',
+          fontSize: '14px',
+          boxShadow: '0 4px 6px rgba(40,167,69,0.2)'
+        }}
+      >
+        📄 Scarica PDF
+      </button>
+    </div>
             <div style={{ overflowX: 'auto', backgroundColor: BIANCO, borderRadius: '15px', padding: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
