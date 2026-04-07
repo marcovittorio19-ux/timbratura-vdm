@@ -9,9 +9,11 @@
     "lint": "eslint .",
     "preview": "vite preview"
   },
-  "dependencies": {
+"dependencies": {
     "@supabase/supabase-js": "^2.101.1",
     "html5-qrcode": "^2.3.8",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
